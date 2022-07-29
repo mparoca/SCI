@@ -5,9 +5,9 @@ account: mariaaroca
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 6713050
-bundleId: 6146688
+bundleId: 6147012
 url: https://mariaaroca.shinyapps.io/demo_SCI/
-when: 1659118553.37313
-lastSyncTime: 1659118553.37313
+when: 1659125716.63747
+lastSyncTime: 1659125716.63747
 asMultiple: FALSE
 asStatic: FALSE
