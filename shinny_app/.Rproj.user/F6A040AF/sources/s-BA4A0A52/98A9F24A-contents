@@ -1,0 +1,350 @@
+---
+title: "Faculty Collaboration Stats"
+runtime: shiny
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+---
+
+<style>
+p.caption {
+  font-size: 0.7em;
+}
+
+
+.thumbnail {
+    float: left; 
+    font-size: 12pt; 
+    text-align: center; 
+    width: 45%; 
+    margin: 0.7em; 
+    box-shadow: 0px 0px 10px rgb(204, 204, 204);
+} 
+
+.thumbnail:hover {
+    
+    transform: scale(1.1);
+    border: 1px solid #18BC9C;
+    cursor: pointer;
+ cursor: hand;
+    
+}
+
+.thumbnail2 {
+    float: right; 
+    font-size: 12pt; 
+    text-align: center; 
+    width: 45%; 
+    margin: 0.7em; 
+    box-shadow: 0px 0px 10px rgb(204, 204, 204);
+} 
+
+.thumbnail2:hover {
+    
+    transform: scale(1.1);
+    border: 1px solid #18BC9C;
+    cursor: pointer;
+ cursor: hand;
+    
+}
+
+
+.summary {
+    padding: 1px;
+    background: rgba(255,255,255,0.1);
+    margin-top: 10px;
+}
+
+h1.title {
+  font-size: 42px;
+  text-shadow: 1px 5px 6px rgba(0,0,0,0.2),
+                 0px -5px 35px rgba(255,255,255,0.3);
+}
+
+
+h1 { /* Header 1 */
+  text-shadow: 1px 5px 6px rgba(0,0,0,0.2),
+                 0px -5px 35px rgba(255,255,255,0.3);
+
+}
+
+h2 { /* Header 2 */
+  text-shadow: 1px 5px 6px rgba(0,0,0,0.2),
+                 0px -5px 35px rgba(255,255,255,0.3); font-size: 36px;
+
+}
+
+table {
+  -webkit-font-smoothing: antialiased;
+  font-size: 105%;
+  overflow: auto;
+  width: 100%;
+  box-shadow: 0px 0px 10px rgb(204, 204, 204);
+}
+thead {
+  background-color: #3B96B0;
+  color: white;
+  font-weight: normal;
+  padding: 50px 30px;
+  text-align: center;
+}
+tbody {
+  background-color: rgb(238, 238, 238);
+  color: rgb(111, 111, 111);
+  padding: 50px 30px;
+}
+
+tr:nth-child(even) {background-color: #fcfcfc;}
+
+tr:hover {background-color: #f4b433;}
+
+.p{
+font-size:120%
+}
+
+.show ~ .content{
+display:none;
+}
+
+.show:focus ~ .content
+{
+display:block;
+border-radius: 25px;
+ background-color: #fbe4b5;
+ box-shadow: 0px 0px 10px rgb(204, 204, 204);
+ padding: 20px;
+ width:58%;
+}
+
+.show:hover ~ .content
+{
+display:block;
+border-radius: 25px;
+ background-color: #fbe4b5;
+ box-shadow: 0px 0px 10px rgb(204, 204, 204);
+ padding: 20px;
+ width:58%;
+}
+
+.show:hover
+{
+ color: #B14934;
+ cursor: pointer;
+ cursor: hand;
+}
+
+.show:focus
+{
+ color: #B14934;
+ cursor: pointer;
+ cursor: hand;
+ outline: none;
+}
+
+
+.text {
+  cursor: pointer;
+}
+
+.text:hover {
+border-radius: 25px;
+ background-color: #fbe4b5;
+ box-shadow: 0px 0px 10px rgb(204, 204, 204);
+ padding: 20px;
+ width:45%;
+  }
+.text:active {
+    color: #B14934 
+  }
+
+
+.alert-danger{
+  background-color: #B14934 ;
+  box-shadow: 0px 0px 10px rgb(204, 204, 204);
+  border-style:none;
+}
+
+.alert-success{
+  background-color: #ECF0F5 ;
+  box-shadow: 0px 0px 10px rgb(204, 204, 204);
+  border-style:none;
+  color:#2C3E50;
+  width:24%;
+}
+
+.alert-info{
+  background-color: #488BB8 ;
+  box-shadow: 0px 0px 10px rgb(204, 204, 204);
+  border-style:none;
+  float: right;
+  width: 45%;
+  margin: 0.7em; 
+}
+
+.alert-warning{
+  background-color: #f4b433;
+  box-shadow: 0px 0px 10px rgb(204, 204, 204);
+  border-style:none;
+  
+
+}
+
+
+</style>
+
+
+```{r, echo = FALSE, warning=FALSE, message=FALSE, include=FALSE}
+library(knitr)
+library(reshape2)
+library(kableExtra)
+library(igraph)
+
+load("r_data.RData")
+
+
+graph=g
+    
+    iso <- V(graph)[degree(graph)==0]
+    g2 <- delete.vertices(graph, iso)
+    dg <- decompose.graph(g2) # returns a list of three graphs
+    dg1<-dg[[1]]
+    
+    G<-dg1 #only giant component
+    
+    Full_name<-paste(V(G)$last_name, V(G)$first_name, sep=", ")
+    Department<-V(G)$department
+    Degree<-round(degree(G), digits=3)
+    Eigen<-round(eigen_centrality(G)$vector, digits=3)
+    Closeness<-round(closeness(G), digits=4)
+    Betweenness<-round(betweenness(G, directed=FALSE), digits=2)
+    V(G)$art_point<-"No"
+    V(G)[articulation.points(G)]$art_point<-"Yes"
+    Articulation_point<-V(G)$art_point
+    
+    centrality_measures<-cbind(Full_name, Department, Degree, Eigen, Closeness, Betweenness, Articulation_point)
+    
+    centrality_measures<-centrality_measures[order(Full_name),]
+    centrality_measures<-as.data.frame(centrality_measures)
+    centrality_measures$Degree<-as.numeric(as.character(centrality_measures$Degree))
+    centrality_measures$Eigen<-as.numeric(as.character(centrality_measures$Eigen))
+    centrality_measures$Closeness<-as.numeric(as.character(centrality_measures$Closeness))
+    centrality_measures$Betweenness<-as.numeric(as.character(centrality_measures$Betweenness))
+
+
+```
+
+
+
+# Ranking Faculty Members using Network Metrics
+
+<br>
+
+Which members are critical in the collaboration network? 
+
+* The extent to which an actor is influential or important in a network has been argued to depend on his or her *centrality* in the network. 
+
+* There are different way we can measure this importance, depending on the concept of centrality we want to capture. 
+
+* We can first start by looking at the question of which of the members have more connections across the network. 
+
+* However, there are other ways in which members can be central pieces of the network. 
+
+* We can also use network analysis to find paths between pairs of faculty members and use centrality measures as an aid to strengthen or create connections between them. 
+
+<br>
+
+---
+
+## Who are the most connected faculty members?
+
+<br>
+
+* There are many different measures of centrality, all related to different concepts of how a node can be prominent within a network: 
+
+* One of the most widely used, **Degree** centrality indicates how well a node is connected in terms of the number of direct connections on the network (the number of links incident upon a node). 
+
+* Generally, vertices with higher degree tend to have a greater capacity to influence others and transmit information (Yan 2009).
+
+<br>
+
+<p class="thumbnail">
+<a href="https://www.docdroid.net/ROZhbQY/biofabric-collaboration-network.pdf" 
+title="View  and download pdf with Biofabric of the gigant component of Collaboration Network"
+target="_blank">
+<img src="images/biofabric_thumb.png" style="width:357px; height:221px;"> 
+</a>Biofabric of the gigant component of Collaboration Network <br />
+<span style="color: #CCCCCC; font-size: 9pt;">
+<i class="glyphicon glyphicon-new-window"></i>Click to view on new window </span>
+</p>
+
+<div class="alert alert-info"> <span class="glyphicon glyphicon-info-sign" aria-hidden="true"></span>
+<span class="sr-only">Error:</span>
+ A good way to visualize who the members with highest numbers of direct connections are in large networks is the BioFabric tool, which uses horizontal lines instead of points to represent the vertices. Edges are shown using vertical line segments. The inset detail shows a close-up of the upper left corner of the network. The node at the left-most position is the highest-degree node in the network, and the default layout is a breadth-first search of the network starting from that node, with neighboring nodes traversed in order of decreasing node degree.
+</div>
+
+<p style="clear: both;">
+
+<br>
+
+### <i class="glyphicon glyphicon-star-empty"></i> TOP 10 Faculty Members: Degree Centrality  
+
+```{r, echo = FALSE, warning=FALSE, message=FALSE, fig.height = 3, fig.width = 3, fig.align = "center"}
+top_degree <- centrality_measures[with(centrality_measures,order(-Degree)),]
+top_degree <- top_degree[1:10,]
+
+library(knitr)
+kable(top_degree[,c(1,2,3)], row.names=FALSE, col.names = c("Name", "Department", "Degree"))
+
+```
+
+
+---
+
+
+## Beyond Degree: Interactive Visualization of Network Centralities
+
+
+
+<p class="thumbnail2">
+<a href="https://mariaaroca.shinyapps.io/centrality/" 
+title="Visualize and rank faculty members according to different measures of network centrality. Compare measures of centrality. "
+target="_blank">
+<img src="images/centrality_thumb.png" style="width:357px; height:221px;"> 
+</a>Centrality of Faculty in gigant component of Collaboration Network<br />
+<span style="color: #CCCCCC; font-size: 9pt;">
+<i class="glyphicon glyphicon-new-window"></i>Click to view on new window </span>
+</p>
+
+
+<br>
+
+* **Eigen Centrality**: Degree centrality does not take into account how important the vertices connected to a given vertex are. With Eigen Centrality vertices connected to other vertices that themselves are highly connected receive more weight, such that a vertex is important if it is linked to by other important vertices.
+
+*  **Closeness Centrality** is based on proximity and measures of how easily a node can reach other nodes in a network. The average length of the shortest path between the node and all other nodes in the graph. Thus, the more central a node is, the closer it is to all other nodes. Closeness can be regarded as a measure of how long it will take information to spread from a given vertex to others in the network and focuses on the extensivity of influence over the entire network (Yan 2009).
+
+* **Betweenness centrality**  is based on how important a node is in terms of connecting nodes to one another. Betweenness centrality quantifies the number of times a node acts as a bridge along the shortest path between two other nodes. Vertices with a high betweenness play the role of connecting different groups and control the flow of knowledge between otherwise disconnected groups. Removing vertices with high betweeness increases the distance between others (Yan 2009).
+
+<br>
+
+### <i class="glyphicon glyphicon-star-empty"></i> TOP 10 Faculty Members: Betweenness Centrality
+
+```{r, echo = FALSE, warning=FALSE, message=FALSE, fig.height = 3, fig.width = 3, fig.align = "center"}
+top_between <- centrality_measures[with(centrality_measures,order(-Betweenness)),]
+top_between <- top_between[1:10,]
+
+library(knitr)
+kable(top_between[,c(1,2,6)], row.names=FALSE, col.names = c("Name", "Department", "Betweenness"))
+
+```
+
+<br>
+
+---
+
+# Finding a path between Faculty Members: Interactive Visualization
+
+
+

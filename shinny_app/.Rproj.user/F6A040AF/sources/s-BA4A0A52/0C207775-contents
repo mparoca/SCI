@@ -1,0 +1,307 @@
+---
+title: "An Exploration of Collaborative Scientific Production at Rice University"
+runtime: shiny
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    theme: flatly
+---
+
+<style>
+.thumbnail {
+    float: left; 
+    font-size: 12pt; 
+    text-align: center; 
+    width: 45%; 
+    margin: 0.7em; 
+    box-shadow: 0px 0px 10px rgb(204, 204, 204);
+} 
+
+.thumbnail:hover {
+    
+    transform: scale(1.1);
+    border: 1px solid #2C3E50;
+    cursor: pointer;
+ cursor: hand;
+    
+}
+
+
+.summary {
+    padding: 1px;
+    background: rgba(255,255,255,0.1);
+    margin-top: 10px;
+}
+
+h1.title {
+  font-size: 42px;
+  text-shadow: 1px 5px 6px rgba(0,0,0,0.2),
+                 0px -5px 35px rgba(255,255,255,0.3);
+}
+
+
+h1 { /* Header 1 */
+  text-shadow: 1px 5px 6px rgba(0,0,0,0.2),
+                 0px -5px 35px rgba(255,255,255,0.3);
+
+}
+
+h2 { /* Header 2 */
+  text-shadow: 1px 5px 6px rgba(0,0,0,0.2),
+                 0px -5px 35px rgba(255,255,255,0.3); font-size: 36px;
+
+}
+
+h3 {font-size: 22px;
+  text-shadow: 1px 5px 6px rgba(0,0,0,0.2),
+                 0px -5px 35px rgba(255,255,255,0.3);
+
+}
+
+table {
+  -webkit-font-smoothing: antialiased;
+  font-size: 105%;
+  overflow: auto;
+  width: 100%;
+  box-shadow: 0px 0px 10px rgb(204, 204, 204);
+}
+thead {
+  background-color: #3B96B0;
+  color: white;
+  font-weight: normal;
+  padding: 50px 30px;
+  text-align: center;
+}
+tbody {
+  background-color: rgb(238, 238, 238);
+  color: rgb(111, 111, 111);
+  padding: 50px 30px;
+}
+
+tr:nth-child(even) {background-color: #fcfcfc;}
+
+tr:hover {background-color: #f4b433;}
+
+.p{
+font-size:120%
+}
+
+.show ~ .content{
+display:none;
+}
+
+.show:focus ~ .content
+{
+display:block;
+border-radius: 25px;
+ background-color: #fbe4b5;
+ box-shadow: 0px 0px 10px rgb(204, 204, 204);
+ padding: 20px;
+ width:58%;
+}
+
+.show:hover ~ .content
+{
+display:block;
+border-radius: 25px;
+ background-color: #fbe4b5;
+ box-shadow: 0px 0px 10px rgb(204, 204, 204);
+ padding: 20px;
+ width:58%;
+}
+
+.show:hover
+{
+ color: #B14934;
+ cursor: pointer;
+ cursor: hand;
+}
+
+.show:focus
+{
+ color: #B14934;
+ cursor: pointer;
+ cursor: hand;
+ outline: none;
+}
+
+
+.alert-danger{
+  background-color: #B14934 ;
+  box-shadow: 0px 0px 10px rgb(204, 204, 204);
+  border-style:none;
+}
+
+.alert-success{
+  background-color: #ECF0F5 ;
+  box-shadow: 0px 0px 10px rgb(204, 204, 204);
+  border-style:none;
+  color:#2C3E50;
+  width:24%;
+}
+
+.alert-info{
+  background-color: #488BB8 ;
+  box-shadow: 0px 0px 10px rgb(204, 204, 204);
+  border-style:none;
+}
+
+.alert-warning{
+  background-color: #f4b433;
+  box-shadow: 0px 0px 10px rgb(204, 204, 204);
+  border-style:none;
+  
+
+}
+
+
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, error=TRUE)
+
+```
+
+```{r, echo=FALSE}
+library(htmltools)
+htmltools::img(src = knitr::image_uri(file.path("D:/Dropbox/Collaboration_at_Rice_Project/collabproject/collabproject/4e3ae6225ce75165b3316226763e1813057700a0/images/banner2.png")), 
+               alt = 'logo', width="800", height="auto", 
+               style = 'position:relative; left:0%; top: 50%; z-index: -1;')
+```
+
+
+
+
+---
+
+# Overview
+
+This website provides you with a detailed picture of the scientific collaboration patterns of faculty at *Rice University* and suggests possible avenues to strengthen collaboration at the institution. How has academic output evolved at Rice, and how much of this output is cross-disciplinary and collaborative? Who are the most collaborative faculty members, and to what can we attribute the emergence of collaborative teams? These are but a few of the questions that can be explored through the staticis we have aggregated from multiple databases of peer-reviewed literature and that you can examine with our interactive data visualisations and reports.
+
+
+---
+
+# Why Measure Collaboration?
+
+ <ins>**Collaboration Promotes:**</ins>
+
+ <div class="alert glyphicon glyphicon-transfer"> <strong>
+INFORMATION: </strong> Collaboration networks constitute critical avenues for the acquisition of information and resources. They augment the ability to identify opportunities, provide access to resources, create timing advantages, and constitute a source of status and referrals for faculty members.</div>
+
+
+ <div class="alert glyphicon glyphicon-queen"> <strong>IMPACT:</strong> The positions of authors in the collaboration network play important roles in taking advantage of diverse resources, thereby significantly influencing citations to their scholarship.</div>
+ 
+ 
+  <div class="alert glyphicon glyphicon-link"> <strong>INNOVATION:</strong> As our individual knowledge base is becoming more and more specialized, major projects require collaboration to enhance the potential for large-scale innovation.</div>
+
+---
+ 
+ <ins>**Understading collaboration patterns can help administrators:**</ins>
+
+<div class="alert glyphicon glyphicon-piggy-bank"> <strong> Increase the efficiency of decision-making processes:</strong> Aid in exploring which faculty and departments are most participative in collaborative networks, which show the best signs of growth and success. Help make decisions on university spending and retention, allocation of organizational roles and office spaces on campus.</div>
+
+<div class="alert glyphicon glyphicon-wrench"> <strong> Fix systematic factors that undermine collaboration :</strong> While there are many idiosyncratic factors influencing individual collaborations, systematic factors also play a role. Understanding what factors are relevant to collaboration dynamics can help administrators create policies that promote collaboration.</div>
+
+---
+
+# What's in our dataset?
+
+```{r, echo=FALSE}
+library(htmltools)
+htmltools::img(src = knitr::image_uri(file.path("D:/Dropbox/Collaboration_at_Rice_Project/collabproject/collabproject/4e3ae6225ce75165b3316226763e1813057700a0/images/legend.png")), 
+               alt = 'logo', width="1000", height="250",
+               style = 'position:static; left: 50px; top: -10px; z-index: -1; padding:10px;')
+```
+
+
+<div class="alert alert"> <strong> SOURCE :</strong> Fundamental data was provided by **Academic Analytics** and **Elsevier Scopus**, the most complete sources available of peer-reviewed literature. </ins> </div>
+
+<div class="alert alert"> <strong> TYPE OF DATA :</strong> Although many types of data could be used to explore collaboration patterns, the most commonly examined is co-authorship in scholarly publications.  These data, while an imperfect reflection of the products of collaboration, provide an objective and important source of information about collaborative scholarly output.</div>
+
+
+<div class="alert alert"> <strong> WHAT'S A COLLABORATION?:</strong> In all cases a collaboration happens when two faculty members coauthor a publication. 
+</ins> </div>
+
+
+<div class="alert alert"> <strong> PUBLICATION TYPES :</strong> Three types of scientific products were considered: <ins>Articles, Conference Proceedings, Books and Book Chapters.</ins> </div>
+
+
+<div class="alert alert"> <strong> PERIOD UNDER STUDY :</strong> Only publications between 2011 and April 2018 were selected, as this corresponds to the last year a massive faculty building move occurred (year of completion of Brockman Hall). </ins> </div>
+
+<div class="alert alert"> <strong> ONLY PUBLICATIONS WHEN AT RICE :</strong> We exclude publications with dates before the faculty member joined Rice by selecting only those entries published after the authors start date at Rice, to avoid capturing entries published while the authors had different associations. </ins> </div>
+
+<div class="alert alert"> <strong> DEPARTMENTS :</strong> We include publications from faculty of all 33 *Rice* departments listed in the figure above . </ins> </div>
+
+<div class="alert alert"> <strong> FACULTY :</strong> We only include publications from active faculty as of April 2018. </ins> </div>
+
+<div class="alert alert-danger"> <span class="glyphicon glyphicon-warning-sign" aria-hidden="true"></span>
+<strong> Warning! </strong> These datasets not always accurately reflect the full publication record for each individual, especially in the Humanities and Social Sciences. </ins> </div>
+
+
+---
+
+# What's NOT in our dataset?
+
+- Graduate student publications or collaborations
+- Publications from faculty not at Rice as of April 2018, or collaborations with faculty not at Rice as of April 2018.
+- Types of academic products or collaborations outside Articles, Conference Proceedings, Books and Book Chapters.
+
+<div class="alert alert-info"> <span class="glyphicon glyphicon-bullhorn" aria-hidden="true"></span>
+<strong> External Collaborations: 
+</strong> Collaborations extend beyond the Rice campus. Although we understand their value, the current version of the data does not capture these. We hope we can we can expand our current scope to include these collaborations in future iterations of the project. </ins> </div>
+
+<div class="alert alert-warning"> <span class="glyphicon glyphicon-bullhorn" aria-hidden="true"></span>
+<strong> Important! 
+</strong> Go to the *Data & Sources* tab for more detailed information on how the datasets were created. </ins> </div>
+
+---
+
+
+# About the Office of Research
+
+```{r, include=FALSE}
+library(htmltools)
+
+```
+
+<br/>
+
+<h3> **Yousif Shamoo** </h3>
+<h4>Vice Provost for Research. Professor of Biosciences at Rice.Professor of Biosciences at Rice.<h4> 
+<p>713-348-5493</p>
+<p>shamoo@rice.edu</p>
+
+<br/>
+
+
+<h3> **William Turner** </h3>
+<h4>Assistant Vice Provost for Research.<h4> 
+<p>713-348-6071</p>
+<p>William.Turner@rice.edu</p>
+
+<br/>
+
+<h3> **Elle Ristow** </h3>
+<h4>Project Manager.<h4> 
+<p>713-348-3329</p>
+<p>elle.ristow@rice.edu</p>
+
+<br/>
+
+<h3> **Maria Aroca** </h3>
+<h4>Phd Candidate Department of Political Science at Rice. Research assistantship and website design.<h4> 
+<p>713-438-7760</p>
+<p>Maria.P.Aroca@rice.edu</p>
+
+<br/>
+
+
+
+
+
+
+
+

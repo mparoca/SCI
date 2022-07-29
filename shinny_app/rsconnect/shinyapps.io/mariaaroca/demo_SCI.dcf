@@ -1,0 +1,13 @@
+name: demo_SCI
+title: demo_SCI
+username:
+account: mariaaroca
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 6713050
+bundleId: 6146290
+url: https://mariaaroca.shinyapps.io/demo_SCI/
+when: 1659110987.48093
+lastSyncTime: 1659110987.48093
+asMultiple: FALSE
+asStatic: FALSE

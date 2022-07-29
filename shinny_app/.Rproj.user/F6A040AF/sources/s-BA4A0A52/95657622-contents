@@ -1,0 +1,222 @@
+
+
+# LOAD LIBRARIES ----------------------------------------------------------
+library(shiny)
+library(shinydashboard)
+library(dplyr)
+library(glue)
+library(shinyauthr)
+library(RSQLite)
+library(DBI)
+library(lubridate)
+library(fresh)
+library(shinyjs)
+
+# FUNCTIONS ---------------------------------------------------------------
+# How many days should sessions last?
+cookie_expiry <- 7
+
+# This function must return a data.frame with columns user and sessionid.  Other columns are also okay
+# and will be made available to the app after log in.
+get_sessions_from_db <- function(conn = db, expiry = cookie_expiry) {
+  dbReadTable(conn, "sessions") %>%
+    mutate(login_time = ymd_hms(login_time)) %>%
+    as_tibble() %>%
+    filter(login_time > now() - days(expiry))
+}
+
+# This function must accept two parameters: user and sessionid. It will be called whenever the user
+# successfully logs in with a password.
+add_session_to_db <- function(user, sessionid, conn = db) {
+  tibble(user = user, sessionid = sessionid, login_time = as.character(now())) %>%
+    dbWriteTable(conn, "sessions", ., append = TRUE)
+}
+
+
+# Connect to 
+db <- dbConnect(SQLite(), ":memory:")
+dbCreateTable(db, "sessions", c(user = "TEXT", sessionid = "TEXT", login_time = "TEXT"))
+
+# Usernames and Passwords for Demo
+user_base <- tibble(
+  user = c("user1", "user2"),
+  password = c("pass1", "pass2"),
+  password_hash = sapply(c("pass1", "pass2"), sodium::password_store),
+  permissions = c("admin", "standard"),
+  name = c("admin", "manager")
+)
+
+# List of Tables
+table_intro <- list(custs = "Customer information, including customer id ...", 
+                    prods_i = "Product information, including product id ...",
+                    stores = "Store information, including store id ...",
+                    orders = "Orders information, including order id ...",
+                    order_items = "Order items information ...",
+                    other = "This is a table created by you or other users.")
+
+
+# DASHBOARD THEME ---------------------------------------------------------
+mytheme <- create_theme(
+  adminlte_color(
+    light_blue = "#020205" #Primary status and header color
+  ),
+  adminlte_sidebar(
+    width = "400px", #Width of sidebar
+    dark_bg = "#020205", #Sidebar background color
+    dark_hover_bg = "#f87060",
+    dark_color = "#666370"
+  ),
+  adminlte_global(
+    content_bg = "#FBF8F5", #Background Color
+    box_bg = "#D8DEE9", 
+    info_box_bg = "#D8DEE9"
+  )
+)
+
+# UI ----------------------------------------------------------------------
+ui <- dashboardPage(
+  title = "State Constitutions Initiative",
+  dashboardHeader(
+    title = tags$a(tags$img(src = "logo3.png", align = "left", height="95%")),
+    tags$li(
+      class = "dropdown",
+      style = "padding: 8px;",
+      shinyauthr::logoutUI("logout", 
+                           icon=icon("fas fa-sign-out-alt"), 
+                           class = 'btn-danger', 
+                           style = "color:white; background-color: #020205; border-color: #020205")
+    ),
+    tags$li(
+      class = "dropdown",
+      tags$a(
+        icon("github"),
+        href = "https://github.com/paulc91/shinyauthr",
+        title = "See the code on github"
+      )
+    )
+  ),
+  dashboardSidebar(
+    collapsed = TRUE,
+    div(textOutput("welcome"), style = "padding: 20px"), 
+    sidebarMenu(
+      
+      menuItem("View Tables", tabName = "view_table", icon = icon("search")),
+      menuItem("Create Tables", tabName = "create_table", icon = icon("plus-square")),
+      menuItem("Delete Tables", tabName = "del_table", icon = icon("trash")),
+      menuItem("Update Entries", tabName = "insert_value", icon = icon("edit")),
+      menuItem("Explore Constitutions", tabName = "explore", icon = icon("chart-line")),
+      menuItem("About", tabName = "about", icon = icon("info-circle"))
+    )
+  ),
+  dashboardBody(
+    shinyauthr::loginUI(
+      "login", 
+      cookie_expiry = cookie_expiry, 
+      additional_ui = tagList(
+        tags$p("Use passwords below to test the application", class = "text-center"),
+        HTML(knitr::kable(user_base[, -3], format = "html", table.attr = "style='width:100%;color:#50A2A7;'"))
+      ), 
+      
+    ),
+    tabItems(
+      tabItem(tabName = "view_table", uiOutput("tab1UI")),
+      tabItem(tabName = "del_table", uiOutput("tab2UI")),
+      tabItem(tabName = "update_table", uiOutput("tab3UI")),
+      tabItem(tabName = "create_table", uiOutput("tab4UI")),
+      tabItem(tabName = "insert_value", uiOutput("tab5UI")),
+      tabItem(tabName = "about", uiOutput("tab6UI"))
+    ),
+    
+    uiOutput("testUI"),
+    use_theme(mytheme), # <-- use the theme
+    includeCSS("www/dark_mode.css"),
+  )
+)
+
+
+
+# SERVER ------------------------------------------------------------------
+
+server <- function(input, output, session) {
+  
+  # call login module supplying data frame, user and password cols and reactive trigger
+  credentials <- shinyauthr::loginServer(
+    id = "login",
+    data = user_base,
+    user_col = user,
+    pwd_col = password_hash,
+    sodium_hashed = TRUE,
+    cookie_logins = TRUE,
+    sessionid_col = sessionid,
+    cookie_getter = get_sessions_from_db,
+    cookie_setter = add_session_to_db,
+    log_out = reactive(logout_init())
+  )
+  
+  # call the logout module with reactive trigger to hide/show
+  logout_init <- shinyauthr::logoutServer(
+    id = "logout",
+    active = reactive(credentials()$user_auth)
+  )
+  
+  observe({
+    if (credentials()$user_auth) {
+      shinyjs::removeClass(selector = "body", class = "sidebar-collapse")
+    } else {
+      shinyjs::addClass(selector = "body", class = "sidebar-collapse")
+    }
+  })
+  
+  user_info <- reactive({
+    credentials()$info
+  })
+  
+  user_data <- reactive({
+    req(credentials()$user_auth)
+    
+    if (user_info()$permissions == "admin") {
+      dplyr::starwars[, 1:10]
+    } else if (user_info()$permissions == "standard") {
+      dplyr::storms[, 1:11]
+    }
+  })
+  
+  output$welcome <- renderText({
+    req(credentials()$user_auth)
+    
+    glue("Welcome {user_info()$name} !")
+  })
+  
+
+  
+
+  
+  output$tab4UI <- renderUI({
+    req(credentials()$user_auth)
+    box(width = NULL, status = "primary",
+        textInput(inputId = "table_name", label = "Table name"),
+        numericInput(inputId = "ncols", label = "Number of columns", 1, min = 1),
+        uiOutput(outputId = "cols"),
+        actionButton(inputId = "create_table", label = "Create table", class = "btn-info", style = "")
+    )
+  })
+  
+  output$cols <- renderUI({
+    req(input$ncols >= 1)
+    cols <- vector("list", input$ncols)
+    for (i in seq_len(input$ncols)) {
+      cols[[i]] <- box(
+        title = paste("Column", i), width = 6, solidHeader = TRUE, status = "primary",
+        textInput(inputId = paste0("colName", i), label = "Column name"),
+        selectInput(inputId = paste0("colType", i), label = "Column type", 
+                    choices = c("NUMERIC", "VARCHAR(255)","BOOLEAN","DATE")
+        )
+      )
+    }
+    cols
+  })
+
+  
+}
+
+shiny::shinyApp(ui, server)

@@ -1,0 +1,31 @@
+/* Get Font Awesome */
+
+@import url("https://use.fontawesome.com/releases/v5.14.0/css/all.css"); 
+
+.well {
+  background-color: black;
+  color: white;
+}
+
+
+.btn-primary {
+    color: white;
+    background-color: #020205;
+    border-color: #020205;
+}
+
+.btn-primary:hover {
+    color: #18d777;
+    background-color: #50A2A7;
+    border-color: #020205;
+}
+
+
+.btn-primary:after {
+    font-family: "Font Awesome 5 Free";
+    content: '\f2f6';
+    padding-left: 5px;
+    position: relative;
+    font-size: 100%;
+    font-weight: 900;
+}

@@ -1,0 +1,580 @@
+#
+# This is a Shiny web application. You can run the application by clicking
+# the 'Run App' button above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    http://shiny.rstudio.com/
+#
+
+#Load Packages
+library("shiny")
+library("igraph")
+library("threejs")
+library("shinydashboard")
+library("DT")
+library("htmlwidgets")
+library("scatterD3")
+library("webshot")
+library("shinyjs")
+library("V8")
+
+jsCode <- 'shinyjs.winprint = function(){
+window.print();
+}'
+
+
+# Load Data
+load("r_data.RData")
+
+
+# User Interface ----------------------------------------------------------
+
+ui <- dashboardPage(
+  title="Network Centrality (Only Giant Component nodes)",
+                    dashboardHeader(title = img(src="logo2.png", height = 50, align = "left", "Network Centrality Plots"),
+                                    titleWidth = "35%",
+                                    tags$li(a(actionButton("print", "PRINT PAGE", 
+                                                           icon("print")),
+                                              title = "PRINT PAGE"),
+                                            class = "dropdown")),
+                    dashboardSidebar(disable=TRUE),
+                    dashboardBody(
+                      
+                      fluidRow(
+                        
+                        column(width = 2,
+                               
+                               helpText("Select a centrality measure to color nodes. Only nodes above the selected percentile on the chosen centrality measure
+                                        will be colored. Only nodes in the giant component drawn. On the second tab a table with the values of these centrality measures
+                                        are shown for each faculty. On the third tab, the measures are compared to each other."), 
+                               
+                               # Boxes need to be put in a row (or column)
+                               box(collapsible = TRUE, width=NULL, status = "primary", "",
+                                   title="Select Centrality Measure", solidHeader = TRUE,
+                                   selectInput('cetype', 'Select Measure to color and size vertices:', choices= c("Degree"="degree", 
+                                                                                                 "Eigen"="eigen",
+                                                                                                 "Closeness"="closeness",
+                                                                                                 "Betweeness"="betweenness",
+                                                                                                 "Bridges (Articulation Points)"=
+                                                                                                   "articulation.points"), selected = "degree")
+                               ),
+                               box(collapsible = TRUE, width=NULL, status = "primary", "",
+                                   title="Select Percentile", solidHeader = TRUE,
+                                   sliderInput("percentile", "Select percentile above which to color central vertices:",
+                                               min = 0.75, max = 0.99,
+                                               value = 0.97, step = 0.01)
+                               ), 
+                               hr(),
+                               helpText("*Data from Scopus and Academic Analytics. \n**Dataset consists of articles, conference proceedings, books and book chapters published between 2011 and April 2018.
+                                        ***Only active faculty as of April 2018 drawn.
+                                        "), 
+                               #downloadButton('export', label="Download as PDF"), 
+                               useShinyjs(),
+                               extendShinyjs(text = jsCode)
+                               ),
+                        
+                        tags$head(tags$style("#threejsnet{height:100vh !important;}")),
+                        tags$head(tags$style("#threejsnet2{height:100vh !important;}")),
+                        tags$head(tags$style("#table{height:100vh !important;}")),
+
+                        column(width = 10,
+                               tabsetPanel(
+                               tabPanel("Network Graph", 
+                                        
+                                        p(textOutput('dynamicText')),
+                                        scatterplotThreeOutput("threejsnet", width="auto"),
+                                           style="background-color: #eeeeee;"),
+                                 
+                               tabPanel("Centrality Measures Table", DT::dataTableOutput('table'),
+                                        style="background-color: #eeeeee;"),
+                              
+                               tabPanel("Relationship between Measures", 
+                                        
+                                        p(textOutput('dynamicText2')),
+                                        plotOutput("Corrplot", width = "100%", height = "600px"),
+                                        p(textOutput('dynamicText3')),
+                                        scatterD3Output("d3out",  width = "100%", height = "1000px"),
+                                        scatterplotThreeOutput("threejsnet2"),
+                                        style="background-color: #eeeeee;")
+                               ),
+                               
+                        
+                               
+                              # Also add some custom CSS to make the title background area the same
+                               # color as the rest of the header.
+                               tags$head(tags$style(HTML('
+                                                         /* logo */
+                                                         .skin-blue .main-header .logo {
+                                                         background-color: #2C3E50;
+                                                         }
+                                                         
+                                                         /* logo when hovered */
+                                                         .skin-blue .main-header .logo:hover {
+                                                         background-color: #2C3E50;
+                                                         }
+                                                         
+                                                         /* navbar (rest of the header) */
+                                                         .skin-blue .main-header .navbar {
+                                                         background-color: #2C3E50;
+                                                         }        
+                                                         
+                                                         /* main sidebar */
+                                                         .skin-blue .main-sidebar {
+                                                         background-color: #2C3E50;
+                                                         }
+                                                         
+                                                         
+                                                         /* box color */      
+                                                         .box.box-solid.box-primary>.box-header {
+                                                         color:#fff;
+                                                         background:#2C3E50
+                                                         }
+                                                         
+                                                         #print{background-color:#2C3E50; color:#ffff; padding:0px ; border-color: #2C3E50;}
+                                                         
+                                                         #print:hover{
+                                                         color:#ffff; background-color:#7CA999;
+                                                         } 
+                                                         '))),
+                               
+                               tags$head(tags$link(rel = "shortcut icon", href = "favicon.png"))
+                               
+                               )
+                               ) 
+                               )
+                        )
+
+
+
+# Server ------------------------------------------------------------------
+
+server <- function(input, output, session) { 
+
+  
+  observeEvent(input$print, {
+    js$winprint()
+  })
+  
+  
+  
+  if(are.connected(g, "599", "115946")==FALSE){
+    g <- g + edge("115946", "599")
+  }
+
+  
+  gList = list(Unweighted=g,Weighted=gw)
+  
+  
+  observeEvent({
+    input$cetype
+    input$percentile
+  },{
+    
+    output$dynamicText <- renderText({
+      paste(sprintf('You selected %s', input$cetype),
+            if (input$cetype=="degree") {
+              print ("centrality: Degree centrality of a vertex counts the number of other vertices it's connected to.
+                     Vertices in red are the faculty with a degree centrality above the selected percentile. Vertex sizes are adjusted based on their value on this measure.") 
+            }
+            else if (input$cetype=="eigen") {
+              print("centrality: Degree centrality does not take into account how important the vertices connected to a given vertex are. 
+                    Wiith Eigen Centrality vertices connected to other vertices that themselves are highly connected receive more weight, such that a vertex is important if it is linked to by other important vertices.
+                    Vertices in red are the faculty with an eigen centrality above the selected percentile. Vertex sizes are adjusted based on their value on this measure.")
+            
+            }
+            
+            else if (input$cetype=="closeness") {
+              print("centrality: Closeness centrality measures the inverse of the mean distance from a vertex to all other vertices. 
+                    This quantity takes higher values for vertices that are separated from others by only a short geodesic distance on average, 
+                    meaning vertices with higher values have a more direct path to all others.  Nodes high in closeness are situated close to others and can disseminate information and influence and interact with many other actors through direct paths (Valente et al. 2008). 
+                    Vertices in red are the faculty with a closeness centrality above the selected percentile. Vertex sizes are adjusted based on their value on this measure.")
+              
+            }
+            
+            else if (input$cetype=="betweenness") {
+              print("centrality: Betweenness centrality quantifies the extent to which a vertex acts as a bridge along the shortest path between two other vertices.
+                    High betweenness centrality vertices lie on communication paths and their removal will most disrupt communications between other vertices. Actors high on this measure have the potential to influence others near them through direct and indirect pathways and can influence the spread of information through the network by enabling communication between others (Valente et al. 2008).  
+                    Vertices in red are the faculty with a betweenness centrality above the selected percentile. Vertex sizes are adjusted based on their value on this measure.")
+              
+            }
+            
+            else if (input$cetype=="articulation.points") {
+              print(": Articuation points or cut vertices are vertices whose removal increases the number of connected components in a graph, and hence disconnects the graph.
+                    They represent vulnerabilities in a connected network. Vertices in red are articulation points and edges in red are those that would be removed should the articulation point be removed")
+              
+            }
+            
+            )
+    })
+    
+    
+    output$threejsnet<- renderScatterplotThree({
+      # minimal example
+      graph=g
+        
+      iso <- V(graph)[degree(graph)==0]
+      g2 <- delete.vertices(graph, iso)
+      dg <- decompose.graph(g2) # returns a list of three graphs
+      dg1<-dg[[1]]
+      
+      G<-dg1 #only giant component
+      label2<-paste(paste(V(G)$last_name, V(G)$first_name, sep=","),"[",V(G)$department,"]",sep="")
+      
+      
+      if (input$cetype=="articulation.points") {
+        
+        set.seed(1)
+        
+        ##  Set normal vertices to black:
+        V(G)$color <- "#c7c7c7"
+        
+        ##  Set articulation points to red:
+        V(G)$color[do.call(input$cetype, list(G))] <- "red"
+        
+        ##  Set normal vertices to black:
+        V(G)$size <- 1.5
+        
+        ##  Set articulation points to red:
+        V(G)$size[do.call(input$cetype,list(G))] <- 3.5
+        
+        ##  Set normal vertices to black:
+        V(G)$ln <- ""
+        
+        ##  Set articulation points to red:
+        V(G)$ln[do.call(input$cetype,list(G))] <- V(G)$last_name
+        
+        ##  Set normal edges to black:
+        E(G)$color <- "#c7c7c7"
+        
+        ##  Set bridge edges to red:
+        num_comp <- length( decompose.graph(G) )
+        
+        for (i in 1:length(E(G))) {
+          G_sub <- delete.edges(G, i)
+          if ( length( decompose.graph(G_sub) ) > num_comp ) E(G)$color[i] <- "red"
+        }
+        
+        p<-graphjs(G, vertex.shape = "sphere", vertex.label = label2,
+                repulsion = 5, attraction=0,
+                opacity=0.6, edge.alpha = 0.6, curvature=1,
+                bg="#ECF0F5", 
+                layout_with_kk(G, dim=3)
+                )
+
+          #points3d(vertices(.), color="black", pch=V(G)$ln, size=0.05)
+        
+      }
+      
+      
+      else if (input$cetype=="eigen") {
+        set.seed(1)
+        
+        M = as_adjacency_matrix(G)
+        v = abs(eigen(M)$vector[,1])
+        v = v / max(v)    # normalize
+        V(G)$size<- 3.5 * v
+        
+        V(G)$color<-"#c7c7c7"
+        
+        quant<-quantile(V(G)$size, input$percentile)
+        
+        V(G)[which(V(G)$size>quant)]$color<-"red"
+        
+        p<-graphjs(G, 
+                vertex.label = label2,
+                repulsion = 5, attraction=0,
+                opacity=0.6, edge.alpha = 0.6, curvature=1,
+                bg="#ECF0F5", 
+                vertex.shape = "sphere", 
+                layout_with_kk(G, dim=3), use.orbitcontrols=TRUE)
+        
+        
+      }
+      
+     else  {
+       set.seed(1)
+       #M = as_adjacency_matrix(G)
+       v = do.call(input$cetype,list(G))
+       v = v / max(v)    # normalize
+       V(G)$size<- 3.5 * v
+       
+       V(G)$color<-"#c7c7c7"
+       
+       quant<-quantile(V(G)$size, input$percentile)
+       
+       V(G)[which(V(G)$size>quant)]$color<-"red"
+       
+       p<-graphjs(G, 
+               vertex.label = label2,
+               repulsion = 5, attraction=0,
+               opacity=0.6, edge.alpha = 0.6, curvature=1,
+               bg="#ECF0F5", 
+               vertex.shape = "sphere", 
+               layout_with_kk(G, dim=3), use.orbitcontrols=TRUE)
+       
+      
+     }
+      
+      
+    })
+    
+  
+    
+  })
+  
+  output$table = DT::renderDataTable({
+    
+    graph=g
+    
+    iso <- V(graph)[degree(graph)==0]
+    g2 <- delete.vertices(graph, iso)
+    dg <- decompose.graph(g2) # returns a list of three graphs
+    dg1<-dg[[1]]
+    
+    G<-dg1 #only giant component
+    
+    Full_name<-paste(V(G)$last_name, V(G)$first_name, sep=", ")
+    Department<-V(G)$department
+    Degree<-round(degree(G), digits=3)
+    Eigen<-round(eigen_centrality(G)$vector, digits=3)
+    Closeness<-round(closeness(G), digits=4)
+    Betweenness<-round(betweenness(G, directed=FALSE), digits=2)
+    V(G)$art_point<-"No"
+    V(G)[articulation.points(G)]$art_point<-"Yes"
+    Articulation_point<-V(G)$art_point
+    
+    centrality_measures<-cbind(Full_name, Department, Degree, Eigen, Closeness, Betweenness, Articulation_point)
+    
+    centrality_measures<-centrality_measures[order(Full_name),]
+    centrality_measures<-as.data.frame(centrality_measures)
+    centrality_measures$Degree<-as.numeric(as.character(centrality_measures$Degree))
+    centrality_measures$Eigen<-as.numeric(as.character(centrality_measures$Eigen))
+    centrality_measures$Closeness<-as.numeric(as.character(centrality_measures$Closeness))
+    centrality_measures$Betweenness<-as.numeric(as.character(centrality_measures$Betweenness))
+    
+    DT::datatable(centrality_measures, rownames = FALSE, extensions = 'Buttons', options = list(
+      dom = 'Bfrtip',
+      buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
+    )) %>%
+      formatStyle('Articulation_point', `text-align` = 'center')
+    
+    
+  })
+  
+  
+  output$dynamicText2 <- renderText({
+    print("What's the relationship between the different centrality measures and what can this tell us about the importance of individual faculty members in the collaboration network?
+          As can be seen in the graphical display of the correlation between centralities below, all centralities have positive correlation coefficients, 
+          with Degree centrality being highly positively correlated to Eigen centrality and moderately correlated to Closeness (0.75) and Betweennes (0.71), 
+          and Eigen centrality having a moderate positive correlation with Closeness (0.69). These results are similar to those found on studies that report the correlations between centarlity measures (Valente et al.2008)
+          By far the most interesting relationship to explore is that one between Eigen centrality and Betweenness that displays the lowest coefficient, which suggests
+          that they are distinctive measures that might likely be associated with different outcomes.")})
+  
+  
+  output$Corrplot <-renderPlot({
+    graph=g
+    
+    iso <- V(graph)[degree(graph)==0]
+    g2 <- delete.vertices(graph, iso)
+    dg <- decompose.graph(g2) # returns a list of three graphs
+    dg1<-dg[[1]]
+    
+    G<-dg1 #only giant component
+    
+    Full_name<-paste(V(G)$last_name, V(G)$first_name, sep=", ")
+    Department<-V(G)$department
+    Degree<-degree(G)
+    Eigen<-eigen_centrality(G,scale=FALSE)$vector
+    Closeness<-closeness(G)
+    Betweenness<-betweenness(G, directed=FALSE)
+    V(G)$art_point<-"No"
+    V(G)[articulation.points(G)]$art_point<-"Yes"
+    Articulation_point<-V(G)$art_point
+    color<-V(G)$col
+    
+    label2<-paste(paste(V(G)$last_name, V(G)$first_name, sep=","),"[",V(G)$department,"]",sep="")
+    
+    centrality_measures<-cbind(Full_name, Department, Degree, Eigen, Closeness, Betweenness, Articulation_point, color, label2)
+    
+    centrality_measures<-centrality_measures[order(Full_name),]
+    centrality_measures<-as.data.frame(centrality_measures)
+    centrality_measures$Degree<-as.numeric(as.character(centrality_measures$Degree))
+    centrality_measures$Eigen<-as.numeric(as.character(centrality_measures$Eigen))
+    centrality_measures$Closeness<-as.numeric(as.character(centrality_measures$Closeness))
+    centrality_measures$Betweenness<-as.numeric(as.character(centrality_measures$Betweenness))
+    centrality_measures$label2<-as.character(centrality_measures$label2)
+    
+    
+    
+    library("corrplot")
+    ## corrplot 0.84 loaded
+    graph=g
+    
+    iso <- V(graph)[degree(graph)==0]
+    g2 <- delete.vertices(graph, iso)
+    dg <- decompose.graph(g2) # returns a list of three graphs
+    dg1<-dg[[1]]
+    
+    G<-dg1 #only giant component
+    
+    Full_name<-paste(V(G)$last_name, V(G)$first_name, sep=", ")
+    Department<-V(G)$department
+    Degree<-degree(G)
+    Eigen<-eigen_centrality(G,scale=FALSE)$vector
+    Closeness<-closeness(G)
+    Betweenness<-betweenness(G, directed=FALSE)
+    V(G)$art_point<-"No"
+    V(G)[articulation.points(G)]$art_point<-"Yes"
+    Articulation_point<-V(G)$art_point
+    color<-V(G)$col
+    
+    label2<-paste(paste(V(G)$last_name, V(G)$first_name, sep=","),"[",V(G)$department,"]",sep="")
+    
+    centrality_measures<-cbind(Full_name, Department, Degree, Eigen, Closeness, Betweenness, Articulation_point, color, label2)
+    
+    centrality_measures<-centrality_measures[order(Full_name),]
+    centrality_measures<-as.data.frame(centrality_measures)
+    centrality_measures$Degree<-as.numeric(as.character(centrality_measures$Degree))
+    centrality_measures$Eigen<-as.numeric(as.character(centrality_measures$Eigen))
+    centrality_measures$Closeness<-as.numeric(as.character(centrality_measures$Closeness))
+    centrality_measures$Betweenness<-as.numeric(as.character(centrality_measures$Betweenness))
+    centrality_measures$label2<-as.character(centrality_measures$label2)
+    
+    M <- cor(centrality_measures[,3:6])
+    corrplot(M, method = "number", type = "upper", bg="#eeeeee", tl.srt = 45)
+  }, 
+  
+  bg="#eeeeee")
+  
+  
+  output$dynamicText3 <- renderText({
+    print("Any actor with a high score on both measures is obviously an important vertex in the network, 
+being highly and directly connected to many other faculty members and thus being in an optimal position to trasmit and receive information.
+An actor with high Betweenness but low Eigenvector centrality is not necessarily directly connected to the most important or central actors but may provide the only path (even if indirect) to a central actor of more distant parts of the network by serving as gate-keepers between components of the network and its core.
+Ideally we would want to create opportunities for more direct communication between these gate-keepers and the core of the network and be cautious about removing such actors.           
+On the other hand an actor with low Betweenness but high Eigenvector centrality may have unique access to central actors. These are pulse-takers, 
+          well-connected actors at the core of the network who have connections to the most important actors, but who are not necessarily serving as a gateway between other less central parts of the network and its core. 
+          Here the goal would be to create connections between more distanced actors and these pulse-takers. 
+          Creating connections between pulse-takers and gate-keepers might be furitful as it would provide the gate-keepers with possibilities to have stronger
+          connections with more important members and pulse-takers opportunities to connect with less central parts of the network, which would in turn
+          make those less central parts less dependent on the gate-keeper.")
+  })
+  
+  
+  output$d3out<-renderScatterD3({
+    
+    graph=g
+    
+    iso <- V(graph)[degree(graph)==0]
+    g2 <- delete.vertices(graph, iso)
+    dg <- decompose.graph(g2) # returns a list of three graphs
+    dg1<-dg[[1]]
+    
+    G<-dg1 #only giant component
+    
+    Full_name<-paste(V(G)$last_name, V(G)$first_name, sep=", ")
+    Department<-V(G)$department
+    Degree<-degree(G)
+    Eigen<-eigen_centrality(G,scale=FALSE)$vector
+    Closeness<-closeness(G)
+    Betweenness<-betweenness(G, directed=FALSE)
+    V(G)$art_point<-"No"
+    V(G)[articulation.points(G)]$art_point<-"Yes"
+    Articulation_point<-V(G)$art_point
+    color<-V(G)$col
+    
+    label2<-paste(paste(V(G)$last_name, V(G)$first_name, sep=","),"[",V(G)$department,"]",sep="")
+    
+    centrality_measures<-cbind(Full_name, Department, Degree, Eigen, Closeness, Betweenness, Articulation_point, color, label2)
+    
+    centrality_measures<-centrality_measures[order(Full_name),]
+    centrality_measures<-as.data.frame(centrality_measures)
+    centrality_measures$Degree<-as.numeric(as.character(centrality_measures$Degree))
+    centrality_measures$Eigen<-as.numeric(as.character(centrality_measures$Eigen))
+    centrality_measures$Closeness<-as.numeric(as.character(centrality_measures$Closeness))
+    centrality_measures$Betweenness<-as.numeric(as.character(centrality_measures$Betweenness))
+    centrality_measures$label2<-as.character(centrality_measures$label2)
+    
+    
+    centrality_measures$Full_name<-as.character(centrality_measures$Full_name)
+    centrality_measures$last_name<-sapply(strsplit(centrality_measures$Full_name, ","), `[`, 1)
+    
+    cols<-as.vector(centrality_measures$color)
+    names(cols)<-centrality_measures$Department
+    cols<-cols[!duplicated(names(cols))]
+    
+    scatterD3(data = centrality_measures, y = Betweenness, x = Eigen, lab = last_name, 
+              col_var = Department, colors = cols,
+              col_lab="Department")
+    
+    
+  })
+  
+  
+  output$threejsnet2 = renderScatterplotThree({
+    
+    graph=g
+    
+    iso <- V(graph)[degree(graph)==0]
+    g2 <- delete.vertices(graph, iso)
+    dg <- decompose.graph(g2) # returns a list of three graphs
+    dg1<-dg[[1]]
+    
+    G<-dg1 #only giant component
+    
+    Full_name<-paste(V(G)$last_name, V(G)$first_name, sep=", ")
+    Department<-V(G)$department
+    Degree<-degree(G)
+    Eigen<-eigen_centrality(G,scale=FALSE)$vector
+    Closeness<-closeness(G)
+    Betweenness<-betweenness(G, directed=FALSE)
+    V(G)$art_point<-"No"
+    V(G)[articulation.points(G)]$art_point<-"Yes"
+    Articulation_point<-V(G)$art_point
+    color<-V(G)$col
+    
+    label2<-paste(paste(V(G)$last_name, V(G)$first_name, sep=","),"[",V(G)$department,"]",sep="")
+    
+    centrality_measures<-cbind(Full_name, Department, Degree, Eigen, Closeness, Betweenness, Articulation_point, color, label2)
+    
+    centrality_measures<-centrality_measures[order(Full_name),]
+    centrality_measures<-as.data.frame(centrality_measures)
+    centrality_measures$Degree<-as.numeric(as.character(centrality_measures$Degree))
+    centrality_measures$Eigen<-as.numeric(as.character(centrality_measures$Eigen))
+    centrality_measures$Closeness<-as.numeric(as.character(centrality_measures$Closeness))
+    centrality_measures$Betweenness<-as.numeric(as.character(centrality_measures$Betweenness))
+    centrality_measures$label2<-as.character(centrality_measures$label2)
+    
+    
+    scatterplot3js(x=centrality_measures$Eigen, y=centrality_measures$Closeness, 
+                   z=centrality_measures$Betweenness,
+                   col=centrality_measures$color, size=0.3, labels=centrality_measures$label2, pch="@", brush=TRUE,
+                   axisLabels=c("Closeness", "Betweenness", "Eigen"), cex.axis=0.3, cex.lab=0.8, 
+                   bg="#eeeeee", 
+                   brush=TRUE, flip.y = FALSE)
+    
+    
+  })
+  
+  
+#  output$export = downloadHandler(
+#    filename = function() {"plots.pdf"},
+#    content = function(file) {
+#    }
+#  )
+  
+  observeEvent(input$screenshot, {
+    cdat <- session$clientData
+    url <- paste0(cdat$url_protocol,"//",cdat$url_hostname,":", cdat$url_port, cdat$url_pathname,cdat$url_search)
+    print(url)
+     url <- "http://www.google.com/"
+    webshot::webshot(url, "~/Desktop/webshot.png")
+  })
+  
+  
+}
+
+# Create Shiny app object ----------------------------------------------------------
+
+shinyApp(ui, server)
