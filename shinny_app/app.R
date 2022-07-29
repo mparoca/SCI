@@ -550,7 +550,6 @@ output$tab5UI <- renderUI({
   })
   
 
-
   output$dt_table <- DT::renderDT(df_sections(),
     escape = F,
     rownames = FALSE,
@@ -571,7 +570,7 @@ output$tab5UI <- renderUI({
     )
   })
   
-  # when final edit button is clicked, table will be changed
+  # After Click Run Query to Insert New Section and Update Audit Table
   shiny::observeEvent(input$final_edit, {
     
     dbExecute(conn, statement = 
@@ -582,17 +581,17 @@ output$tab5UI <- renderUI({
   })
   
   
-  # Close Button
+  # Close Button. Remove Modal after click of close button
   shiny::observeEvent(input$dismiss_modal, {
     shiny::removeModal()
   })
   
-  # After Click modal will dissapear
+  # After Click Success Message Will appear
   shiny::observeEvent(input$final_edit, {
     shinyalert("Success", paste0('Section Added!', 
                                  '\nNote: Refresh to see Change.', 
                                  '\nChange is logged into section_history audit table'), type = "success")
-    #shiny::removeModal()
+    #shiny::removeModal() # Don't remove modal, person might want to create another section
   })
  
   
@@ -618,7 +617,7 @@ output$tab5UI <- renderUI({
 
   })
  
-  # After Click Sections will be deleted
+  # After Click run Query to Delete Section and update audit table
 observeEvent(c(input$deletion), {
   
   row2 <- df_sections()[strtoi(strsplit(input$current_id, "_")[[1]][2]), ]
@@ -655,7 +654,7 @@ observeEvent(c(input$deletion), {
   })
 
   
-  # After Click Sections will be updated
+  # After Click Run Query to update section and audit table
   shiny::observeEvent(input$final_edit2, {
     row3 <- df_sections()[strtoi(strsplit(input$current_id, "_")[[1]][2]), ]
     
@@ -680,6 +679,7 @@ observeEvent(c(input$deletion), {
     
 
   
+
 
 # Explore Constitutions Tab -----------------------------------------------
 
