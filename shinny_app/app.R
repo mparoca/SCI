@@ -472,7 +472,7 @@ server <- function(input, output, session) {
   # Output table  
   output$sel_table_view <- DT::renderDT(dbGetQuery(conn, statement = paste0('SELECT * from ',input$sel_table_1)),
                                       filter = 'bottom',
-                                      options = list(autoWidth = TRUE, scrollX = TRUE,
+                                      options = list(autoWidth = FALSE, scrollX = TRUE,
                                                      initComplete = JS(
                                                        "function(settings, json) {",
                                                        "$(this.api().table().header()).css({'background-color': '#000', 'color': '#fff'});",
@@ -544,7 +544,8 @@ output$tab5UI <- renderUI({
     rows = dbGetQuery(conn, statement = paste0('SELECT COUNT(*) FROM sections WHERE constitution_id="',input$sel_constitution, '"'))
     x = create_btns(1:rows$`COUNT(*)`[1])
     df <- df %>%
-      dplyr::bind_cols(tibble("Buttons" = x))
+      dplyr::bind_cols(tibble("Modify" = x))
+    df <- df[, c(12, 1:11)]
     return(df)
   })
   
@@ -555,6 +556,7 @@ output$tab5UI <- renderUI({
     rownames = FALSE,
     filter = 'bottom',
     options = list(autoWidth = TRUE, scrollX = TRUE,processing=FALSE, pageLength = 5,
+                   columnDefs = list(list(width = '80px', targets = 0)),
                              initComplete = JS(
                                "function(settings, json) {",
                                "$(this.api().table().header()).css({'background-color': '#000', 'color': '#fff'});",
@@ -621,7 +623,9 @@ observeEvent(c(input$deletion), {
   dbExecute(conn, statement = paste0('UPDATE sections SET is_deleted=1, section_year = ', input$num,', updated_by="admin" where section_id="', section_id_val3, '";'))
   
   
-    shinyalert("Success", paste0(section_id_val3, ' deleted! Year of repeal:', input$num) , type = "success")
+    shinyalert("Success", paste0(section_id_val3, ' deleted! Year of repeal:', input$num, 
+                                 "\nNote: Entry will not be removed from DB, but is_deleted
+                                 column will take the value of 1. Refresh to see change.") , type = "success")
   
   })
   
