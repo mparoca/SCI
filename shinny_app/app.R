@@ -374,7 +374,8 @@ ui <- dashboardPage(
     
     uiOutput("testUI"),
     use_theme(mytheme), # <-- use the theme
-    includeCSS("www/dark_mode.css")
+    includeCSS("www/dark_mode.css"), 
+    tags$head(tags$link(rel = "shortcut icon", href = "favicon.ico"))
   )
 )
 
