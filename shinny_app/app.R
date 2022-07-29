@@ -16,53 +16,12 @@ library(DT)
 library(shinyalert)
 library(plotly)
 
-# FUNCTIONS ---------------------------------------------------------------
-# How many days should sessions last?
-cookie_expiry <- 7
-
-# This function must return a data.frame with columns user and sessionid.  Other columns are also okay
-# and will be made available to the app after log in.
-get_sessions_from_db <- function(conn = db, expiry = cookie_expiry) {
-  dbReadTable(conn, "sessions") %>%
-    mutate(login_time = ymd_hms(login_time)) %>%
-    as_tibble() %>%
-    filter(login_time > now() - days(expiry))
-}
-
-# This function must accept two parameters: user and sessionid. It will be called whenever the user
-# successfully logs in with a password.
-add_session_to_db <- function(user, sessionid, conn = db) {
-  tibble(user = user, sessionid = sessionid, login_time = as.character(now())) %>%
-    dbWriteTable(conn, "sessions", ., append = TRUE)
-}
 
 
-# Connect to 
-db <- dbConnect(SQLite(), ":memory:")
-dbCreateTable(db, "sessions", c(user = "TEXT", sessionid = "TEXT", login_time = "TEXT"))
+# DB CONNECTION -----------------------------------------------------------
 
-# Usernames and Passwords for Demo. This will be changed in production and stored securely
-user_base <- tibble(
-  user = c("user1", "user2"),
-  password = c("pass1", "pass2"),
-  password_hash = sapply(c("pass1", "pass2"), sodium::password_store),
-  permissions = c("admin", "standard"),
-  name = c("admin", "guest")
-)
-
-# Create Buttons to Modify or Delte a Section
-
-create_btns <- function(x) {
-  x %>%
-    purrr::map_chr(~
-                     paste0(
-                       '<div class = "btn-group">
-                   <button class="btn btn-default action-button btn-info action_button" id="edit_',
-                       .x, '" type="button" onclick=get_id(this.id)><i class="fas fa-edit"></i></button>
-                   <button class="btn btn-default action-button btn-danger action_button" id="delete_',
-                       .x, '" type="button" onclick=get_id(this.id)><i class="fa fa-trash-alt"></i></button></div>'
-                     ))
-}
+# Connect to RSQLite DB
+conn <- dbConnect(RSQLite::SQLite(), "data/constitutionsdb.db")
 
 
 # DASHBOARD THEME ---------------------------------------------------------
@@ -87,9 +46,278 @@ mytheme <- create_theme(
 
 
 
-# DB Connection -----------------------------------------------------------
-# Connect to RSQLite DB
-conn <- dbConnect(RSQLite::SQLite(), "data/constitutionsdb.db")
+# MODALS AND BUTTONS ------------------------------------------------------
+
+# Create Buttons to Modify or Delte a Section
+create_btns <- function(x) {
+  x %>%
+    purrr::map_chr(~
+                     paste0(
+                       '<div class = "btn-group">
+                   <button class="btn btn-default action-button btn-info action_button" id="edit_',
+                       .x, '" type="button" onclick=get_id(this.id)><i class="fas fa-edit"></i></button>
+                   <button class="btn btn-default action-button btn-danger action_button" id="delete_',
+                       .x, '" type="button" onclick=get_id(this.id)><i class="fa fa-trash-alt"></i></button></div>'
+                     ))
+}
+
+# Modal pop up to add Sections
+modal_dialog <- function(section_id, constitution_id, section_year, article_num,
+                         section_num, part_num, section_topic,section_text, edit) {
+  if (edit) {
+    x <- "Submit Edits"
+  } else {
+    x <- "Add New Section"
+  }
+  shiny::modalDialog(
+    title = "Edit Constitution",
+    div("Warning: All inputs must be filled before submitting!"),
+    div(
+      class = "text-center",
+      div(
+        style = "display: inline-block;",
+        shiny::textInput(
+          inputId = "section_id_val",
+          label = "Section Id",
+          value = section_id,
+          placeholder = "Input Section Id",
+          width = "400px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::textInput(
+          inputId = "constitution_id_val",
+          label = "Constitution Id",
+          value = constitution_id,
+          placeholder = "Input Constitution Id",
+          width = "200px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::numericInput(
+          inputId = "section_year_val",
+          label = "Amendment Year",
+          value = section_year,
+          width = "200px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::numericInput(
+          inputId = "article_num_val",
+          label = "Article Number",
+          value = article_num,
+          width = "200px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::numericInput(
+          inputId = "section_num_val",
+          label = "Section Number",
+          value = section_num,
+          width = "200px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::numericInput(
+          inputId = "part_num_val",
+          label = "Part Number",
+          value = part_num,
+          width = "200px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::textInput(
+          inputId = "section_topic_val",
+          label = "Section Topic",
+          value = section_topic,
+          placeholder = "Input Topic",
+          width = "200px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::textInput(
+          inputId = "section_text_val",
+          label = "Section Text",
+          value = section_text,
+          placeholder = "Input Text",
+          width = "400px"
+        )
+      )
+    ),
+    size = "m",
+    easyClose = TRUE,
+    footer = div(
+      class = "pull-right container",
+      shiny::actionButton(
+        inputId = "final_edit",
+        label = x,
+        icon = shiny::icon("edit"),
+        class = "btn-info"
+      ),
+      shiny::actionButton(
+        inputId = "dismiss_modal",
+        label = "Close",
+        class = "btn-danger"
+      )
+    )
+  ) %>% shiny::showModal()
+}
+
+
+# Modal pop up to modify Sections
+modal_dialog2 <- function(section_id2, constitution_id2, section_year2, article_num2,
+                          section_num2, part_num2, section_topic2,section_text2, edit) {
+  if (edit) {
+    x <- "Submit Edits"
+  } else {
+    x <- "Add New Section"
+  }
+  shiny::modalDialog(
+    title = "Edit Constitution",
+    div("Warning: All inputs must be filled before submitting!"),
+    div(
+      class = "text-center",
+      div(
+        style = "display: inline-block;",
+        shiny::textInput(
+          inputId = "section_id_val2",
+          label = "Section Id",
+          value = section_id2,
+          placeholder = "Input Section Id",
+          width = "400px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::textInput(
+          inputId = "constitution_id_val2",
+          label = "Constitution Id",
+          value = constitution_id2,
+          placeholder = "Input Constitution Id",
+          width = "200px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::numericInput(
+          inputId = "section_year_val2",
+          label = "Amendment Year",
+          value = section_year2,
+          width = "200px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::numericInput(
+          inputId = "article_num_val2",
+          label = "Article Number",
+          value = article_num2,
+          width = "200px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::numericInput(
+          inputId = "section_num_val2",
+          label = "Section Number",
+          value = section_num2,
+          width = "200px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::numericInput(
+          inputId = "part_num_val2",
+          label = "Part Number",
+          value = part_num2,
+          width = "200px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::textInput(
+          inputId = "section_topic_val2",
+          label = "Section Topic",
+          value = section_topic2,
+          placeholder = "Input Topic",
+          width = "200px"
+        )
+      ),
+      div(
+        style = "display: inline-block;",
+        shiny::textInput(
+          inputId = "section_text_val2",
+          label = "Section Text",
+          value = section_text2,
+          placeholder = "Input Text",
+          width = "400px"
+        )
+      )
+    ),
+    size = "m",
+    easyClose = TRUE,
+    footer = div(
+      class = "pull-right container",
+      shiny::actionButton(
+        inputId = "final_edit2",
+        label = x,
+        icon = shiny::icon("edit"),
+        class = "btn-info"
+      ),
+      shiny::actionButton(
+        inputId = "dismiss_modal",
+        label = "Close",
+        class = "btn-danger"
+      )
+    )
+  ) %>% shiny::showModal()
+}
+
+
+# AUTHENTICATION FUNCTIONS ------------------------------------------------
+
+# Authentication shinyauthr Functions taken from https://github.com/PaulC91/shinyauthr
+# How many days should sessions last?
+cookie_expiry <- 7
+
+# This function must return a data.frame with columns user and sessionid.  Other columns are also okay
+# and will be made available to the app after log in.
+get_sessions_from_db <- function(conn = db, expiry = cookie_expiry) {
+  dbReadTable(conn, "sessions") %>%
+    mutate(login_time = ymd_hms(login_time)) %>%
+    as_tibble() %>%
+    filter(login_time > now() - days(expiry))
+}
+
+# This function must accept two parameters: user and sessionid. It will be called whenever the user
+# successfully logs in with a password.
+add_session_to_db <- function(user, sessionid, conn = db) {
+  tibble(user = user, sessionid = sessionid, login_time = as.character(now())) %>%
+    dbWriteTable(conn, "sessions", ., append = TRUE)
+}
+
+# Connect to 
+db <- dbConnect(SQLite(), ":memory:")
+dbCreateTable(db, "sessions", c(user = "TEXT", sessionid = "TEXT", login_time = "TEXT"))
+
+# Usernames and Passwords for Demo. This will be changed in production and stored securely
+user_base <- tibble(
+  user = c("user1", "user2"),
+  password = c("pass1", "pass2"),
+  password_hash = sapply(c("pass1", "pass2"), sodium::password_store),
+  permissions = c("admin", "standard"),
+  name = c("admin", "guest")
+)
+
+
+
 
 
 
@@ -123,8 +351,6 @@ ui <- dashboardPage(
       
       menuItem("View Tables", tabName = "view_table", icon = icon("search")),
       menuItem("Explore Constitutions", tabName = "explore", icon = icon("chart-line")),
-      #menuItem("Create Tables", tabName = "create_table", icon = icon("plus-square")),
-      #menuItem("Delete Tables", tabName = "del_table", icon = icon("trash")),
       menuItem("Update Entries", tabName = "insert_value", icon = icon("edit")),
       menuItem("About", tabName = "about", icon = icon("info-circle"))
     )
@@ -141,9 +367,6 @@ ui <- dashboardPage(
     ),
     tabItems(
       tabItem(tabName = "view_table", uiOutput("tab1UI")),
-      #tabItem(tabName = "del_table", uiOutput("tab2UI")),
-      #tabItem(tabName = "update_table", uiOutput("tab3UI")),
-      #tabItem(tabName = "create_table", uiOutput("tab4UI")),
       tabItem(tabName = "explore", uiOutput("tab2UI")),
       tabItem(tabName = "insert_value", uiOutput("tab5UI")),
       tabItem(tabName = "about", uiOutput("tab6UI"))
@@ -154,6 +377,10 @@ ui <- dashboardPage(
     includeCSS("www/dark_mode.css")
   )
 )
+
+
+
+
 
 
 
@@ -308,7 +535,9 @@ output$tab5UI <- renderUI({
 })
   
   
-  
+
+# ADD SECTION -------------------------------------------------------------
+
   df_sections <- reactive({
     df = dbGetQuery(conn, statement = paste0('SELECT * FROM sections WHERE constitution_id="',input$sel_constitution, '"'))
     rows = dbGetQuery(conn, statement = paste0('SELECT COUNT(*) FROM sections WHERE constitution_id="',input$sel_constitution, '"'))
@@ -433,8 +662,10 @@ observeEvent(c(input$deletion), {
     
  
   
-# Update Explore Constitutions --------------------------------------------
 
+# Explore Constitutions Tab -----------------------------------------------
+
+  #Explore Constitutions UI
   output$tab2UI <- renderUI({
     req(credentials()$user_auth)
     
@@ -456,7 +687,7 @@ observeEvent(c(input$deletion), {
   })
   
 
-  
+# VALUE BOXES  
 output$YearBox <- renderValueBox({
   year_adopted = dbGetQuery(conn, statement = paste0('SELECT year_of_adoption as year FROM constitutions WHERE constitution_id="',input$sel_constitution2, '"'))
     valueBox(
@@ -484,6 +715,9 @@ output$YearBox <- renderValueBox({
     )
   })
   
+  
+  
+# PLOTLY OUTPUT  
   
   year_data <- reactive({
     year_adopted3 = dbGetQuery(conn, statement = paste0('SELECT year_of_adoption as year FROM constitutions WHERE constitution_id="',input$sel_constitution2, '"'))
@@ -517,225 +751,7 @@ output$YearBox <- renderValueBox({
 }
 
 
-# FUNCTION TO ADD SECTIONS
-modal_dialog <- function(section_id, constitution_id, section_year, article_num,
-                         section_num, part_num, section_topic,section_text, edit) {
-  if (edit) {
-    x <- "Submit Edits"
-  } else {
-    x <- "Add New Section"
-  }
-  shiny::modalDialog(
-    title = "Edit Constitution",
-    div("Warning: All inputs must be filled before submitting!"),
-    div(
-      class = "text-center",
-      div(
-        style = "display: inline-block;",
-        shiny::textInput(
-          inputId = "section_id_val",
-          label = "Section Id",
-          value = section_id,
-          placeholder = "Input Section Id",
-          width = "400px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::textInput(
-          inputId = "constitution_id_val",
-          label = "Constitution Id",
-          value = constitution_id,
-          placeholder = "Input Constitution Id",
-          width = "200px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::numericInput(
-          inputId = "section_year_val",
-          label = "Amendment Year",
-          value = section_year,
-          width = "200px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::numericInput(
-          inputId = "article_num_val",
-          label = "Article Number",
-          value = article_num,
-          width = "200px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::numericInput(
-          inputId = "section_num_val",
-          label = "Section Number",
-          value = section_num,
-          width = "200px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::numericInput(
-          inputId = "part_num_val",
-          label = "Part Number",
-          value = part_num,
-          width = "200px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::textInput(
-          inputId = "section_topic_val",
-          label = "Section Topic",
-          value = section_topic,
-          placeholder = "Input Topic",
-          width = "200px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::textInput(
-          inputId = "section_text_val",
-          label = "Section Text",
-          value = section_text,
-          placeholder = "Input Text",
-          width = "400px"
-        )
-      )
-    ),
-    size = "m",
-    easyClose = TRUE,
-    footer = div(
-      class = "pull-right container",
-      shiny::actionButton(
-        inputId = "final_edit",
-        label = x,
-        icon = shiny::icon("edit"),
-        class = "btn-info"
-      ),
-      shiny::actionButton(
-        inputId = "dismiss_modal",
-        label = "Close",
-        class = "btn-danger"
-      )
-    )
-  ) %>% shiny::showModal()
-}
 
 
-# FUNCTION TO ADD SECTIONS
-modal_dialog2 <- function(section_id2, constitution_id2, section_year2, article_num2,
-                         section_num2, part_num2, section_topic2,section_text2, edit) {
-  if (edit) {
-    x <- "Submit Edits"
-  } else {
-    x <- "Add New Section"
-  }
-  shiny::modalDialog(
-    title = "Edit Constitution",
-    div("Warning: All inputs must be filled before submitting!"),
-    div(
-      class = "text-center",
-      div(
-        style = "display: inline-block;",
-        shiny::textInput(
-          inputId = "section_id_val2",
-          label = "Section Id",
-          value = section_id2,
-          placeholder = "Input Section Id",
-          width = "400px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::textInput(
-          inputId = "constitution_id_val2",
-          label = "Constitution Id",
-          value = constitution_id2,
-          placeholder = "Input Constitution Id",
-          width = "200px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::numericInput(
-          inputId = "section_year_val2",
-          label = "Amendment Year",
-          value = section_year2,
-          width = "200px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::numericInput(
-          inputId = "article_num_val2",
-          label = "Article Number",
-          value = article_num2,
-          width = "200px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::numericInput(
-          inputId = "section_num_val2",
-          label = "Section Number",
-          value = section_num2,
-          width = "200px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::numericInput(
-          inputId = "part_num_val2",
-          label = "Part Number",
-          value = part_num2,
-          width = "200px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::textInput(
-          inputId = "section_topic_val2",
-          label = "Section Topic",
-          value = section_topic2,
-          placeholder = "Input Topic",
-          width = "200px"
-        )
-      ),
-      div(
-        style = "display: inline-block;",
-        shiny::textInput(
-          inputId = "section_text_val2",
-          label = "Section Text",
-          value = section_text2,
-          placeholder = "Input Text",
-          width = "400px"
-        )
-      )
-    ),
-    size = "m",
-    easyClose = TRUE,
-    footer = div(
-      class = "pull-right container",
-      shiny::actionButton(
-        inputId = "final_edit2",
-        label = x,
-        icon = shiny::icon("edit"),
-        class = "btn-info"
-      ),
-      shiny::actionButton(
-        inputId = "dismiss_modal",
-        label = "Close",
-        class = "btn-danger"
-      )
-    )
-  ) %>% shiny::showModal()
-}
-
-
-
+# CREATE SHINY APP OBJECT -------------------------------------------------
 shiny::shinyApp(ui, server)
