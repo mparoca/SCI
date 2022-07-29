@@ -589,17 +589,20 @@ output$tab5UI <- renderUI({
   
   # After Click modal will dissapear
   shiny::observeEvent(input$final_edit, {
-    shinyalert("Success", "Section Added!", type = "success")
+    shinyalert("Success", paste0('Section Added!', 
+                                 '\nNote: Refresh to see Change.', 
+                                 '\nChange is logged into section_history audit table'), type = "success")
     #shiny::removeModal()
   })
  
   
 
 # DELETE SECTION ----------------------------------------------------------
+  
+  #POP UP TO INPUT YEAR OF REPEAL
   shiny::observeEvent(input$current_id, {
     shiny::req(!is.null(input$current_id) & stringr::str_detect(input$current_id, pattern = "delete"))
-    
-    #df$section_id
+
     row <- df_sections()[strtoi(strsplit(input$current_id, "_")[[1]][2]), ]
     section_id_val2 <-row$section_id
 
@@ -614,7 +617,8 @@ output$tab5UI <- renderUI({
     )
 
   })
-  
+ 
+  # After Click Sections will be deleted
 observeEvent(c(input$deletion), {
   
   row2 <- df_sections()[strtoi(strsplit(input$current_id, "_")[[1]][2]), ]
@@ -625,10 +629,12 @@ observeEvent(c(input$deletion), {
   
     shinyalert("Success", paste0(section_id_val3, ' deleted! Year of repeal:', input$num, 
                                  "\nNote: Entry will not be removed from DB, but is_deleted
-                                 column will take the value of 1. Refresh to see change.") , type = "success")
+                                 column will take the value of 1. Refresh to see change.", 
+                                 '\nChange is logged into section_history audit table') , type = "success")
   
   })
   
+  # Show text of year of repeal
   output$year <- renderText({input$num})
   
   
@@ -647,25 +653,32 @@ observeEvent(c(input$deletion), {
       section_topic2 = row$section_topic, section_text2 = row$section_text, edit = TRUE
     )
   })
-  
-  # when final edit button is clicked, table will be changed
-  #shiny::observeEvent(input$final_edit2, {
-    
-    #dbExecute(conn, statement = 
-    #            paste0('INSERT INTO sections (section_id, constitution_id, section_year, article_num, section_num, part_num, section_topic, 
-    #      section_text, is_deleted, created_by, updated_by) 
-    #      VALUES ("', input$section_id_val, '", "', input$constitution_id_val, '",', input$section_year_val, ', ', input$article_num_val, ',', input$section_num_val, ', ', input$part_num_val, ', "', input$section_topic_val, '", "', input$section_text_val, '", "0", "admin", "admin");'))
-    
-  #})
-  
 
-  # After Click modal will dissapear
+  
+  # After Click Sections will be updated
   shiny::observeEvent(input$final_edit2, {
-    shinyalert("Success", "Section Modified!", type = "success")
+    row3 <- df_sections()[strtoi(strsplit(input$current_id, "_")[[1]][2]), ]
+    
+    dbExecute(conn, statement=
+                paste0(
+                  'UPDATE sections SET section_id="', input$section_id_val2, 
+                  '", constitution_id ="', input$constitution_id_val2,
+                  '", section_topic ="', input$section_topic_val2,
+                  '", section_text ="', input$section_text_val2,
+                  '", section_year =', input$section_year_val2,
+                  ', article_num =', input$article_num_val2,
+                  ', section_num =', input$section_num_val2,
+                  ', part_num =', input$part_num_val2,
+                  ', updated_by="admin" WHERE section_id="', row3$section_id, '"'))
+    
+    shinyalert("Success", paste0('Section ', row3$section_id,' Modified!', 
+                                 '\nNote: Refresh to see Change in Section.', 
+                                 '\nChange is logged into section_history audit table'), type = "success")
+    shiny::removeModal()
   })
   
     
- 
+
   
 
 # Explore Constitutions Tab -----------------------------------------------
