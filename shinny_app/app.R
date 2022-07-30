@@ -510,7 +510,12 @@ output$tab5UI <- renderUI({
     fluidPage(
       column(
         width = 12,
-      # div(style = "display: none;", icon("refresh")),
+        tags$h2(glue("Your permission level is: {user_info()$permissions}.
+                     You logged in at: {user_info()$login_time}.")),
+        tags$h4(glue("Note: Because Dataset is not yet public, only sections and amendments
+                     from a sample of states (Alabama, Alaska and Arizona) have been added to this Demo.
+                     Remaining state documents will appear without sections.")),
+        tags$h3(glue("")),
       selectInput(inputId = "sel_constitution", label= "Select Constitution:", choices = dbGetQuery(conn, 'SELECT constitution_id FROM constitutions'), selected ="Alabama1819"),
       div(
         class = "container",
@@ -698,11 +703,12 @@ observeEvent(c(input$deletion), {
         tags$h3(glue("")),
         selectInput(inputId = "sel_constitution2", label= "Select Constitution:", 
                     choices = dbGetQuery(conn, 'SELECT constitution_id FROM constitutions'), 
-                    selected ="Alabama1819")),
+                    selected ="Alabama1901")),
       valueBoxOutput("YearBox"),
       valueBoxOutput("SectionsBox"),
       valueBoxOutput("AmendmentsBox"),
-      box(plotlyOutput("plot1"), width = 12)
+      box(plotlyOutput("plot1"), width = 12),
+      box(plotlyOutput("plot2"), width = 12)
     
       #DT::DTOutput(outputId = "dt_counts")
       
@@ -746,31 +752,96 @@ output$YearBox <- renderValueBox({
   year_data <- reactive({
     year_adopted3 = dbGetQuery(conn, statement = paste0('SELECT year_of_adoption as year FROM constitutions WHERE constitution_id="',input$sel_constitution2, '"'))
     counts = dbGetQuery(conn, statement = paste0('SELECT section_year as count FROM sections WHERE constitution_id="',input$sel_constitution2, '" AND section_year>', year_adopted3))
-    year = factor(counts$count,levels=c(year_adopted3$year:max(counts)+1))
-    year = table(year)
-    year_df <- as.data.frame(year)
+    if (nrow(counts)==0){
+      year=seq(year_adopted3$year, year_adopted3$year+20, by=1)
+      Freq = rep(0, 21)
+      year_df <- data.frame(year, Freq)
+    }
+    else {
+      year = factor(counts$count,levels=c(year_adopted3$year:max(counts)+1))
+      year = table(year)
+      year_df <- as.data.frame(year)
+    }
     return(year_df)
+  })
+  
+  topic_data <-reactive({
+    topic_count <- dbGetQuery(conn, statement = 
+                                paste0('SELECT COUNT(*) as total_sections, section_topic as topic FROM sections WHERE constitution_id ="',input$sel_constitution2, '" GROUP BY section_topic ORDER BY total_sections DESC LIMIT 10'))
+    topic_count$topic <- factor(topic_count$topic, levels = unique(topic_count$topic)[order(topic_count$total_sections, decreasing = TRUE)])
+    topic_count <- as.data.frame(topic_count)
   })
   
   output$plot1 <-renderPlotly({ 
     
-    plot_ly(year_data(), x = ~year, y = ~Freq, type = 'scatter', mode = 'lines')
+    plot_ly(year_data(), x = ~year, y = ~Freq, type = 'scatter', 
+            mode = 'lines+markers', line = list(color = '#50A2A7', width = 3), 
+            marker = list(color = '#666370', size = 8)) %>% 
+      layout(
+      title = "\nAmendments per Year\n",
+      yaxis = list(rangemode = "nonnegative"), 
+      showlegend = FALSE
+      )
     
     })
-  
-  output$dt_counts <- DT::renderDT(year_data(),
-                                  escape = F,
-                                  rownames = FALSE,
-                                  filter = 'bottom',
-                                  options = list(autoWidth = TRUE, scrollX = TRUE,processing=FALSE, pageLength = 5,
-                                                 initComplete = JS(
-                                                   "function(settings, json) {",
-                                                   "$(this.api().table().header()).css({'background-color': '#000', 'color': '#fff'});",
-                                                   "}"))
-  )
+
+  output$plot2 <-renderPlotly({ 
+    
+    plot_ly(topic_data(), x = ~topic, y = ~total_sections, type = 'bar', 
+            text = ~total_sections, textposition = 'auto',
+            marker = list(color = '#F87060',
+                          line = list(color = '#50A2A7', width = 1.5))) %>% 
+      layout(
+        title = "\nTop 10 Topics in Document\n"
+      )
+    
+  })
   
   
 
+  
+  
+  
+
+# About Tab ---------------------------------------------------------------
+  output$tab6UI <- renderUI({
+    req(credentials()$user_auth)
+    
+    fluidRow(
+      column(
+        width = 12,
+        box(width = 12,
+            status = "primary",
+            #background="black",
+            tags$h1(glue("About")),
+            tags$h4(glue("This App helps State Constitutions Initiative researchers build a 
+                         dataset of state constitutions and their amendments. 
+                         The State Constitutions Initiative has the objective of creating a digital history of all 154 
+                         adopted constitutions in the U.S. states and all of their amendments with the purpose of allowing researchers to track and visualize the evolution of constitutional text within states, as well as to compare across them. ")),
+            tags$h2(glue("Constitutions Data")),
+            tags$h4(glue("The U.S. Constitutions Dataset (Miller et al., N.D.) is an original dataset 
+                         that contains information of 111 state constitutions from 40 states and all of 
+                         their amendments adopted between 1776 and 2020. 
+                         The Miller. et al. (N.D.) dataset was built with data from The Federal and 
+                         State Constitutions, Colonial Charters, and the Organic Laws of the State, 
+                         Territories, and Colonies; Now or Heretofore Forming the United States of 
+                         America by Francis Newton Thorpe, 
+                         The NBER/Maryland State Constitutions project and information from state 
+                         government websites. ")),
+            tags$h4(glue("Only a sample of the Data is displayed in this Demo.")),
+            tags$h2(glue("Developer")),
+            tags$h4(glue("Maria Aroca")),
+            tags$a(href="https://www.linkedin.com/in/maria-paula-aroca-42a0a5166/", "LinkedIn"),
+            tags$h2(glue("Code")),
+            tags$h4(glue("For the Source Code and more information see GitHub:")),
+            tags$a(href="https://github.com/mparoca/sci", "GitHub"),
+            tags$h3(glue(""))
+            )
+      )
+    )
+  }
+  )
+  
   
 }
 
