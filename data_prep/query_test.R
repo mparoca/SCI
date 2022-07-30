@@ -59,27 +59,11 @@ df_sections <-dbGetQuery(conn, 'SELECT * FROM sections WHERE constitution_id = "
 # Count number of rows
 sections_rows <-dbGetQuery(conn, 'SELECT COUNT(*) FROM sections WHERE constitution_id = "Alabama1861"')
 
-
+# Get year of adoption of Constitution
 year_amendment <-dbGetQuery(conn, 'SELECT year_of_adoption FROM constitutions WHERE constitution_id = "Alabama1861"')
 
 # Count Total Amendments
 dbGetQuery(conn, 'SELECT COUNT(*) as count FROM sections WHERE constitution_id = "Alabama1901" AND section_year>1901')
 
-# Amendment years
-counts <-dbGetQuery(conn, 'SELECT section_year as count FROM sections WHERE constitution_id = "Alabama1901" AND section_year>1901')
-year<-factor(counts$count,levels=c(1901:max(counts)+1))
-year<-table(year)
-year_counts_df <- as.data.frame(year)
-
-library(plotly)
-
-fig <- plot_ly(year_counts_df, x = ~year, y = ~Freq, type = 'scatter', mode = 'lines')
-
-fig
-
-ggplot(year_counts_df, aes(x= year, y = Freq, group=1)) + 
-  geom_line() 
-#section_id, constitution_id, section_year, article_num, section_num, part_num, section_topic, 
-#section_text
-
-
+# Count Total Section within each topic, return top 10
+topic_count <- dbGetQuery(conn, 'SELECT COUNT(*) as count, section_topic as topic FROM sections WHERE constitution_id = "Alabama1901" GROUP BY section_topic ORDER BY count DESC LIMIT 10')
