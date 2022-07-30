@@ -13,6 +13,18 @@ The U.S. Constitutions Dataset (Miller et al., N.D.) is an original dataset that
 
 App is currently hosted on shinyapps.io [here](https://mariaaroca.shinyapps.io/demo_SCI/)
 
+*Explore Constitutions*  
+
+![1 explore page](/assets/screenshot_explore.PNG)
+
+*Update Entries*  
+
+![2 edit page](/assets/screenshot_edit.PNG)
+
+*Update Popups*  
+
+![2 aa](/assets/screenshot_add.PNG)
+
 ## Acknowledgments
 The app makes uses the [shinyauthr](https://github.com/PaulC91/shinyauthr) R package to add a layer of user authentication and to create dynamic user interfaces base on the type of user.
 
