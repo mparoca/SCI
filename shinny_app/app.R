@@ -692,7 +692,13 @@ observeEvent(c(input$deletion), {
         width = 12,
         tags$h2(glue("Your permission level is: {user_info()$permissions}.
                      You logged in at: {user_info()$login_time}.")),
-        selectInput(inputId = "sel_constitution2", label= "Select Constitution:", choices = dbGetQuery(conn, 'SELECT constitution_id FROM constitutions'), selected ="Alabama1819")),
+        tags$h4(glue("Note: Because Dataset is not yet public, only sections and amendments
+                     from a sample of states (Alabama, Alaska and Arizona) have been added to this Demo.
+                     Remaining state documents will appear without sections.")),
+        tags$h3(glue("")),
+        selectInput(inputId = "sel_constitution2", label= "Select Constitution:", 
+                    choices = dbGetQuery(conn, 'SELECT constitution_id FROM constitutions'), 
+                    selected ="Alabama1819")),
       valueBoxOutput("YearBox"),
       valueBoxOutput("SectionsBox"),
       valueBoxOutput("AmendmentsBox"),
