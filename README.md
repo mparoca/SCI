@@ -13,6 +13,8 @@ The U.S. Constitutions Dataset (Miller et al., N.D.) is an original dataset that
 
 App is currently hosted on shinyapps.io [here](https://mariaaroca.shinyapps.io/demo_SCI/)
 
+Link to demo video [here](https://youtu.be/zAelmnIXTAg)
+
 *Explore Constitutions*  
 
 ![1 explore page](/assets/screenshot_explore.png)
