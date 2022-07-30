@@ -46,6 +46,10 @@ dbGetQuery(conn,
            AND section_id="AL_6_164_0_1901"')
 
 
+# Select Only Constitutions from Sections DB
+dbGetQuery(conn, 'SELECT DISTINCT(constitution_id) FROM sections')
+
+
 # Select Unique Constitutions
 dbGetQuery(conn, 'SELECT constitution_id FROM constitutions')
 
